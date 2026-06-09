@@ -296,26 +296,50 @@ function renderAgentSuggestions(suggestions) {
   `;
 }
 
+const OWN_UI_SELECTORS = [
+  '#catalog-section',
+  '#highlight-section',
+  '#productDetailSection',
+  '#cartDrawer',
+  '#agentSuggestions',
+  '.site-header',
+  '.site-footer',
+  '.toast'
+].join(',');
+
+// User-side / non-agent parts of the Embedded Messaging widget we must ignore.
+const USER_CHAT_SELECTORS = [
+  '[data-conversation-entry-sender-role="EndUser"]',
+  '[data-conversation-entry-sender-role="enduser"]',
+  '[data-sender-role="EndUser"]',
+  '.outgoing',
+  '.outgoing-message',
+  '.user-message',
+  '.chasitorText',
+  '.embeddedMessagingTypingIndicator',
+  '.embeddedMessagingConversationButton',
+  'textarea',
+  'input',
+  '[contenteditable="true"]'
+].join(',');
+
 function shouldIgnoreObservedNode(node) {
   const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
   if (!element || !element.closest) return true;
 
-  return Boolean(element.closest([
-    '#catalog-section',
-    '#highlight-section',
-    '#productDetailSection',
-    '#cartDrawer',
-    '#agentSuggestions',
-    '.site-header',
-    '.site-footer',
-    '.toast'
-  ].join(',')));
+  if (element.closest(OWN_UI_SELECTORS)) return true;
+  if (element.closest(USER_CHAT_SELECTORS)) return true;
+
+  return false;
 }
 
 const observedAgentTexts = new Set();
-function handleVisibleAgentText(text) {
-  const compactText = text.replace(/\s+/g, ' ').trim();
-  if (compactText.length < 12 || observedAgentTexts.has(compactText)) return;
+const AGENT_TEXT_DEBOUNCE_MS = 600;
+let pendingAgentText = '';
+let pendingAgentTimer = null;
+
+function processAgentText(compactText) {
+  if (!compactText || observedAgentTexts.has(compactText)) return;
   observedAgentTexts.add(compactText);
 
   if (handleAgentMessage(compactText)) return;
@@ -338,6 +362,22 @@ function handleVisibleAgentText(text) {
   if (mentionedProducts.length > 1) {
     renderAgentSuggestions(mentionedProducts);
   }
+}
+
+function handleVisibleAgentText(text) {
+  const compactText = text.replace(/\s+/g, ' ').trim();
+  if (compactText.length < 12 || observedAgentTexts.has(compactText)) return;
+
+  // While the agent is streaming, the same bubble keeps growing. Hold the latest
+  // version and only act once mutations stop arriving for a short window.
+  pendingAgentText = compactText;
+  clearTimeout(pendingAgentTimer);
+  pendingAgentTimer = setTimeout(() => {
+    const finalText = pendingAgentText;
+    pendingAgentText = '';
+    pendingAgentTimer = null;
+    processAgentText(finalText);
+  }, AGENT_TEXT_DEBOUNCE_MS);
 }
 
 function setupAgentDomObserver() {
