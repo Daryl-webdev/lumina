@@ -261,6 +261,100 @@ function handleAgentMessage(payload) {
   return navigateToProduct(navigationTargets[0].productId, navigationTargets[0].productName);
 }
 
+function findMentionedProducts(text) {
+  const normalized = text.toLowerCase();
+  return products.filter(product => normalized.includes(product.name.toLowerCase()));
+}
+
+function renderAgentSuggestions(suggestions) {
+  if (!suggestions.length) return;
+
+  let panel = document.getElementById('agentSuggestions');
+  if (!panel) {
+    panel = document.createElement('aside');
+    panel.id = 'agentSuggestions';
+    panel.className = 'agent-suggestions';
+    document.body.appendChild(panel);
+  }
+
+  panel.innerHTML = `
+    <div class="agent-suggestions-head">
+      <p>Agent recommendations</p>
+      <button type="button" class="agent-suggestions-close" aria-label="Close recommendations">&times;</button>
+    </div>
+    <div class="agent-suggestions-list">
+      ${suggestions.map(product => `
+        <div class="agent-suggestion-item">
+          <div>
+            <span>${product.name}</span>
+            <small>${fmt(product.price)}</small>
+          </div>
+          <button type="button" data-agent-view="${product.id}">View Product</button>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function shouldIgnoreObservedNode(node) {
+  const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+  if (!element || !element.closest) return true;
+
+  return Boolean(element.closest([
+    '#catalog-section',
+    '#highlight-section',
+    '#productDetailSection',
+    '#cartDrawer',
+    '#agentSuggestions',
+    '.site-header',
+    '.site-footer',
+    '.toast'
+  ].join(',')));
+}
+
+const observedAgentTexts = new Set();
+function handleVisibleAgentText(text) {
+  const compactText = text.replace(/\s+/g, ' ').trim();
+  if (compactText.length < 12 || observedAgentTexts.has(compactText)) return;
+  observedAgentTexts.add(compactText);
+
+  if (handleAgentMessage(compactText)) return;
+
+  const mentionedProducts = findMentionedProducts(compactText);
+  if (mentionedProducts.length === 1) {
+    const checkoutRequested = /proceeding to checkout:/i.test(compactText);
+    const addedToCart = /added to cart:/i.test(compactText);
+
+    if (checkoutRequested || addedToCart) {
+      addToCart(mentionedProducts[0].id);
+      if (checkoutRequested) openCart();
+      return;
+    }
+
+    navigateToProduct(mentionedProducts[0].id, mentionedProducts[0].name);
+    return;
+  }
+
+  if (mentionedProducts.length > 1) {
+    renderAgentSuggestions(mentionedProducts);
+  }
+}
+
+function setupAgentDomObserver() {
+  const observer = new MutationObserver(mutations => {
+    mutations.forEach(mutation => {
+      mutation.addedNodes.forEach(node => {
+        if (shouldIgnoreObservedNode(node)) return;
+
+        const text = node.textContent || '';
+        if (text) handleVisibleAgentText(text);
+      });
+    });
+  });
+
+  observer.observe(document.body, { childList: true, subtree: true });
+}
+
 function setupSalesforceListeners() {
   window.addEventListener('message', event => {
     handleAgentMessage(event.data);
@@ -269,6 +363,8 @@ function setupSalesforceListeners() {
   window.addEventListener('lumina-agent-message', event => {
     handleAgentMessage(event.detail);
   });
+
+  setupAgentDomObserver();
 }
 
 // ============ Cart State ============
@@ -337,6 +433,10 @@ document.addEventListener('click', (e) => {
   if (rmBtn) { e.preventDefault(); removeFromCart(rmBtn.dataset.remove); }
   const productLink = e.target.closest('[data-product-link]');
   if (productLink) { navigateToProduct(productLink.dataset.productLink); }
+  const suggestionView = e.target.closest('[data-agent-view]');
+  if (suggestionView) { navigateToProduct(suggestionView.dataset.agentView); }
+  const suggestionsClose = e.target.closest('.agent-suggestions-close');
+  if (suggestionsClose) { document.getElementById('agentSuggestions')?.remove(); }
 });
 
 document.addEventListener('keydown', (e) => {
@@ -379,5 +479,6 @@ window.addEventListener('hashchange', handleRouting);
 window.LuminaAgentNavigation = {
   handleAgentMessage,
   handleAgentCartCommand,
+  handleVisibleAgentText,
   navigateToProduct
 };
