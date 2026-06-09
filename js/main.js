@@ -199,44 +199,66 @@ function collectTextPayloads(value, output = [], seen = new WeakSet()) {
   return output;
 }
 
-function parseNavigationText(text) {
-  const tokenMatch = text.match(/LUMINA_NAVIGATE_PRODUCT\|productId=([^|]+)\|route=(#[^|\s]+)\|name=([^\n\r]+)/);
-  if (tokenMatch) {
-    return {
-      productId: tokenMatch[1].trim(),
-      route: tokenMatch[2].trim(),
-      productName: tokenMatch[3].trim()
-    };
+function parseNavigationTargets(text) {
+  const targets = [];
+  const tokenPattern = /LUMINA_NAVIGATE_PRODUCT\|productId=([^|]+)\|route=(#[^|\s]+)\|name=([^\n\r]+)/g;
+  const routePattern = /Storefront Route:\s*(#\/?product\/([A-Za-z0-9_-]+))/gi;
+
+  for (const match of text.matchAll(tokenPattern)) {
+    targets.push({
+      productId: match[1].trim(),
+      route: match[2].trim(),
+      productName: match[3].trim()
+    });
   }
 
-  const routeMatch = text.match(/Storefront Route:\s*(#\/?product\/([A-Za-z0-9_-]+))/i);
-  if (routeMatch) {
-    return {
-      productId: routeMatch[2],
-      route: routeMatch[1],
+  for (const match of text.matchAll(routePattern)) {
+    targets.push({
+      productId: match[2],
+      route: match[1],
       productName: ''
-    };
+    });
   }
 
-  const mentionedProduct = products.find(product => text.toLowerCase().includes(product.name.toLowerCase()));
-  if (mentionedProduct) {
-    return {
-      productId: String(mentionedProduct.id),
-      route: getProductRoute(mentionedProduct.id),
-      productName: mentionedProduct.name
-    };
+  return targets;
+}
+
+function parseCartTargets(text) {
+  const targets = [];
+  const cartPattern = /LUMINA_CART_ADD\|productId=([^|]+)\|checkout=(true|false)\|name=([^\n\r]+)/g;
+
+  for (const match of text.matchAll(cartPattern)) {
+    targets.push({
+      productId: match[1].trim(),
+      checkout: match[2] === 'true',
+      productName: match[3].trim()
+    });
   }
 
-  return null;
+  return targets;
+}
+
+function handleAgentCartCommand(payload) {
+  const cartTargets = collectTextPayloads(payload)
+    .flatMap(parseCartTargets)
+    .filter((target, index, targets) => targets.findIndex(item => item.productId === target.productId) === index);
+
+  if (cartTargets.length !== 1) return false;
+
+  addToCart(cartTargets[0].productId);
+  if (cartTargets[0].checkout) openCart();
+  return true;
 }
 
 function handleAgentMessage(payload) {
-  const navigation = collectTextPayloads(payload)
-    .map(parseNavigationText)
-    .find(Boolean);
+  if (handleAgentCartCommand(payload)) return true;
 
-  if (!navigation) return false;
-  return navigateToProduct(navigation.productId, navigation.productName);
+  const navigationTargets = collectTextPayloads(payload)
+    .flatMap(parseNavigationTargets)
+    .filter((target, index, targets) => targets.findIndex(item => item.productId === target.productId) === index);
+
+  if (navigationTargets.length !== 1) return false;
+  return navigateToProduct(navigationTargets[0].productId, navigationTargets[0].productName);
 }
 
 function setupSalesforceListeners() {
@@ -356,5 +378,6 @@ window.addEventListener('hashchange', handleRouting);
 
 window.LuminaAgentNavigation = {
   handleAgentMessage,
+  handleAgentCartCommand,
   navigateToProduct
 };
