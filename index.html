@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
   <title>Lumina Atelier | Fine Luxury Jewelry</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -15,7 +15,7 @@
   <header class="site-header">
     <div class="container header-inner">
       <a href="#" class="brand">
-        <span class="brand-name">LUMINA</span>
+        <span class="brand-name">LUMINAAAAAAA</span>
         <span class="brand-sub">ATELIER</span>
       </a>
 
@@ -152,5 +152,24 @@
   </aside>
 
   <script src="js/main.js"></script>
+  <script type="text/javascript">
+    function initEmbeddedMessaging() {
+      try {
+        embeddedservice_bootstrap.settings.language = 'en_US';
+
+        embeddedservice_bootstrap.init(
+          '00Dg8000006eGtp',
+          'Retail_Service_Agent',
+          'https://os1779160828320.my.site.com/ESWRetailServiceAgent1781007221966',
+          {
+            scrt2URL: 'https://os1779160828320.my.salesforce-scrt.com'
+          }
+        );
+      } catch (err) {
+        console.error('Error loading Embedded Messaging: ', err);
+      }
+    }
+  </script>
+  <script type="text/javascript" src="https://os1779160828320.my.site.com/ESWRetailServiceAgent1781007221966/assets/js/bootstrap.min.js" onload="initEmbeddedMessaging()"></script>
 </body>
 </html>
