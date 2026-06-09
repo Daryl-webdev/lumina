@@ -41,7 +41,7 @@ const fmt = (n) => '$' + n.toLocaleString('en-US');
 function renderCatalog() {
   const grid = document.getElementById('catalogGrid');
   grid.innerHTML = products.map(p => `
-    <article class="product-card${p.highlight ? ' highlight' : ''}" data-id="${p.id}">
+    <article class="product-card${p.highlight ? ' highlight' : ''}" data-id="${p.id}" data-product-link="${p.id}" tabindex="0" role="link" aria-label="View ${p.name}">
       <div class="product-img">
         <img src="${p.image}" alt="${p.name}" loading="lazy" />
       </div>
@@ -62,7 +62,7 @@ function renderCatalog() {
 function renderHighlights() {
   const grid = document.getElementById('highlightGrid');
   grid.innerHTML = products.filter(p => p.highlight).map(p => `
-    <article class="highlight-card" data-id="${p.id}">
+    <article class="highlight-card" data-id="${p.id}" data-product-link="${p.id}" tabindex="0" role="link" aria-label="View ${p.name}">
       <div class="product-img">
         <img src="${p.image}" alt="${p.name}" loading="lazy" />
       </div>
@@ -77,6 +77,176 @@ function renderHighlights() {
       </div>
     </article>
   `).join('');
+}
+
+// ============ Product Detail Routing ============
+function getProductRoute(id) {
+  return '#/product/' + id;
+}
+
+function navigateToProduct(id, productName) {
+  const product = products.find(x => String(x.id) === String(id));
+  if (!product) return false;
+
+  const route = getProductRoute(product.id);
+  if (window.location.hash !== route) window.location.hash = route;
+  handleRouting();
+
+  setTimeout(() => highlightProductInUI(product.id, productName || product.name), 250);
+  return true;
+}
+
+function renderProductDetail(product) {
+  const section = document.getElementById('productDetailSection');
+  if (!section) return;
+
+  section.innerHTML = `
+    <div class="container product-detail-container">
+      <a href="#catalog-section" class="product-back-link" aria-label="Back to catalog">BACK TO CATALOG</a>
+      <div class="product-detail-grid">
+        <div class="product-detail-image">
+          <img src="${product.image}" alt="${product.name}" />
+        </div>
+        <div class="product-detail-copy">
+          <p class="eyebrow">${product.category}</p>
+          <h1 class="product-detail-title">${product.name}</h1>
+          <p class="product-detail-desc">${product.desc}</p>
+          <div class="product-detail-price">${fmt(product.price)}</div>
+          <div class="product-detail-actions">
+            <button class="btn btn-dark" data-add="${product.id}">ADD TO CART</button>
+            <a class="btn btn-light" href="#catalog-section">CONTINUE SHOPPING</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function handleRouting() {
+  const hash = window.location.hash;
+  const productDetailSection = document.getElementById('productDetailSection');
+  const heroBanner = document.querySelector('.hero');
+  const catalogSection = document.getElementById('catalog-section');
+  const highlightSection = document.getElementById('highlight-section');
+
+  if (!productDetailSection) return;
+
+  if (hash.startsWith('#/product/')) {
+    const productId = decodeURIComponent(hash.replace('#/product/', ''));
+    const product = products.find(p => String(p.id) === String(productId));
+
+    if (!product) {
+      window.location.hash = '#';
+      return;
+    }
+
+    if (heroBanner) heroBanner.style.display = 'none';
+    if (catalogSection) catalogSection.style.display = 'none';
+    if (highlightSection) highlightSection.style.display = 'none';
+
+    productDetailSection.style.display = 'block';
+    renderProductDetail(product);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+
+  if (heroBanner) heroBanner.style.display = 'block';
+  if (catalogSection) catalogSection.style.display = 'block';
+  if (highlightSection) highlightSection.style.display = 'block';
+
+  productDetailSection.style.display = 'none';
+  productDetailSection.innerHTML = '';
+
+  if (hash && hash !== '#' && hash.startsWith('#')) {
+    const targetElement = document.querySelector(hash);
+    if (targetElement) {
+      setTimeout(() => targetElement.scrollIntoView({ behavior: 'smooth' }), 100);
+    }
+  }
+}
+
+function highlightProductInUI(productId, productName) {
+  const detailContainer = document.querySelector('.product-detail-grid');
+  if (!detailContainer) return;
+
+  detailContainer.classList.add('agent-highlighted');
+  showToast('Agent suggested: ' + (productName || 'Product'));
+
+  clearTimeout(highlightProductInUI._t);
+  highlightProductInUI._t = setTimeout(() => {
+    detailContainer.classList.remove('agent-highlighted');
+  }, 5000);
+}
+
+function collectTextPayloads(value, output = [], seen = new WeakSet()) {
+  if (value == null) return output;
+
+  if (typeof value === 'string') {
+    output.push(value);
+    return output;
+  }
+
+  if (typeof value !== 'object') return output;
+  if (seen.has(value)) return output;
+  seen.add(value);
+
+  if (Array.isArray(value)) {
+    value.forEach(item => collectTextPayloads(item, output, seen));
+    return output;
+  }
+
+  Object.values(value).forEach(item => collectTextPayloads(item, output, seen));
+  return output;
+}
+
+function parseNavigationText(text) {
+  const tokenMatch = text.match(/LUMINA_NAVIGATE_PRODUCT\|productId=([^|]+)\|route=(#[^|\s]+)\|name=([^\n\r]+)/);
+  if (tokenMatch) {
+    return {
+      productId: tokenMatch[1].trim(),
+      route: tokenMatch[2].trim(),
+      productName: tokenMatch[3].trim()
+    };
+  }
+
+  const routeMatch = text.match(/Storefront Route:\s*(#\/product\/([A-Za-z0-9_-]+))/i);
+  if (routeMatch) {
+    return {
+      productId: routeMatch[2],
+      route: routeMatch[1],
+      productName: ''
+    };
+  }
+
+  const mentionedProduct = products.find(product => text.toLowerCase().includes(product.name.toLowerCase()));
+  if (mentionedProduct) {
+    return {
+      productId: String(mentionedProduct.id),
+      route: getProductRoute(mentionedProduct.id),
+      productName: mentionedProduct.name
+    };
+  }
+
+  return null;
+}
+
+function handleAgentMessage(payload) {
+  const navigation = collectTextPayloads(payload)
+    .map(parseNavigationText)
+    .find(Boolean);
+
+  if (!navigation) return false;
+  return navigateToProduct(navigation.productId, navigation.productName);
+}
+
+function setupSalesforceListeners() {
+  window.addEventListener('message', event => {
+    handleAgentMessage(event.data);
+  });
+
+  window.addEventListener('lumina-agent-message', event => {
+    handleAgentMessage(event.detail);
+  });
 }
 
 // ============ Cart State ============
@@ -143,6 +313,18 @@ document.addEventListener('click', (e) => {
   if (addBtn) { addToCart(parseInt(addBtn.dataset.add, 10)); return; }
   const rmBtn = e.target.closest('[data-remove]');
   if (rmBtn) { e.preventDefault(); removeFromCart(parseInt(rmBtn.dataset.remove, 10)); }
+  const productLink = e.target.closest('[data-product-link]');
+  if (productLink) { navigateToProduct(productLink.dataset.productLink); }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+
+  const productLink = e.target.closest('[data-product-link]');
+  if (!productLink) return;
+
+  e.preventDefault();
+  navigateToProduct(productLink.dataset.productLink);
 });
 
 // ============ Carousel Controls ============
@@ -168,3 +350,11 @@ function showToast(msg) {
 renderCatalog();
 renderHighlights();
 renderCart();
+setupSalesforceListeners();
+handleRouting();
+window.addEventListener('hashchange', handleRouting);
+
+window.LuminaAgentNavigation = {
+  handleAgentMessage,
+  navigateToProduct
+};
