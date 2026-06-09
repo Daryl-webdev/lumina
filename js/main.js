@@ -3,34 +3,34 @@ const IMG_BASE = 'https://storage.googleapis.com/lumina-jewelry-demo-qiugel/imag
 const img = (n) => IMG_BASE + 'Gemini_Generated_Image_qiugelqiugelqiug' + (n === 0 ? '' : ' (' + n + ')') + '.png';
 
 const products = [
-  { id: 1,  name: 'Gold Solitaire Diamond Ring',   category: 'Rings', price: 4500, highlight: true,
+  { id: 'LUMIN-RING-001',  name: 'Gold Solitaire Diamond Ring',   category: 'Rings', price: 4500, highlight: true,
     desc: 'A brilliant round solitaire diamond set in an elegant 18k yellow gold band. A timeless symbol of love.',
     image: img(0) },
-  { id: 2,  name: 'Platinum Diamond Halo Ring',    category: 'Rings', price: 5800, highlight: false,
+  { id: 'AURA-EAR-002',  name: 'Platinum Diamond Halo Ring',    category: 'Rings', price: 5800, highlight: false,
     desc: 'A stunning round-cut diamond framed by a delicate halo of sparkling micro-pavé diamonds on a polished platinum band.',
     image: img(1) },
-  { id: 3,  name: 'Gold Three-Stone Ring',         category: 'Rings', price: 6400, highlight: true,
+  { id: 'ETERN-BRAC-003',  name: 'Gold Three-Stone Ring',         category: 'Rings', price: 6400, highlight: true,
     desc: 'An exquisite round-cut diamond flanked by two matching side diamonds on an 18k yellow gold band, representing past, present, and future.',
     image: img(2) },
-  { id: 4,  name: 'Platinum Pavé Diamond Band',    category: 'Rings', price: 3200, highlight: true,
+  { id: 'CELEST-NECK-004',  name: 'Platinum Pavé Diamond Band',    category: 'Rings', price: 3200, highlight: true,
     desc: 'A half-eternity wedding band encrusted with three rows of brilliant pavé-set diamonds in polished platinum.',
     image: img(3) },
-  { id: 5,  name: 'Gold Eternity Diamond Ring',    category: 'Rings', price: 4200, highlight: false,
+  { id: 'OPUL-RING-005',  name: 'Gold Eternity Diamond Ring',    category: 'Rings', price: 4200, highlight: false,
     desc: 'A solid 18k yellow gold eternity band set with a continuous circle of brilliant-cut diamonds, symbolizing eternal devotion.',
     image: img(4) },
-  { id: 6,  name: 'Marquise Cut Solitaire Ring',   category: 'Rings', price: 5500, highlight: false,
+  { id: 'CASC-EAR-006',  name: 'Marquise Cut Solitaire Ring',   category: 'Rings', price: 5500, highlight: false,
     desc: 'A striking marquise-cut diamond set in a classic four-prong platinum band to elongate the finger and capture light.',
     image: img(5) },
-  { id: 7,  name: 'Princess Cut Solitaire Ring',   category: 'Rings', price: 4900, highlight: false,
+  { id: 'MINIM-BRAC-007',  name: 'Princess Cut Solitaire Ring',   category: 'Rings', price: 4900, highlight: false,
     desc: 'A classic princess-cut square diamond mounted on a sleek 18k yellow gold band for a modern, architectural look.',
     image: img(6) },
-  { id: 8,  name: 'Cushion Cut Halo Ring',         category: 'Rings', price: 6100, highlight: false,
+  { id: 'ELYS-NECK-008',  name: 'Cushion Cut Halo Ring',         category: 'Rings', price: 6100, highlight: false,
     desc: 'A soft cushion-cut diamond bordered by a sparkling halo of diamonds, set on a thin platinum band.',
     image: img(7) },
-  { id: 9,  name: 'Vintage Filigree Bezel Ring',   category: 'Rings', price: 3800, highlight: false,
+  { id: 'CLASS-EAR-009',  name: 'Vintage Filigree Bezel Ring',   category: 'Rings', price: 3800, highlight: false,
     desc: 'An intricate, antique-inspired gold ring featuring filigree details and an octagonal bezel-set diamond.',
     image: img(8) },
-  { id: 10, name: 'Bezel Solitaire Platinum Ring', category: 'Rings', price: 4700, highlight: false,
+  { id: 'AMOR-RING-010', name: 'Bezel Solitaire Platinum Ring', category: 'Rings', price: 4700, highlight: false,
     desc: 'A contemporary round solitaire diamond encased in a protective, modern bezel setting on a polished platinum band.',
     image: img(9) },
 ];
@@ -81,7 +81,7 @@ function renderHighlights() {
 
 // ============ Product Detail Routing ============
 function getProductRoute(id) {
-  return '#/product/' + id;
+  return '#product/' + id;
 }
 
 function navigateToProduct(id, productName) {
@@ -131,8 +131,8 @@ function handleRouting() {
 
   if (!productDetailSection) return;
 
-  if (hash.startsWith('#/product/')) {
-    const productId = decodeURIComponent(hash.replace('#/product/', ''));
+  if (hash.startsWith('#product/') || hash.startsWith('#/product/')) {
+    const productId = decodeURIComponent(hash.replace(/^#\/?product\//, ''));
     const product = products.find(p => String(p.id) === String(productId));
 
     if (!product) {
@@ -209,7 +209,7 @@ function parseNavigationText(text) {
     };
   }
 
-  const routeMatch = text.match(/Storefront Route:\s*(#\/product\/([A-Za-z0-9_-]+))/i);
+  const routeMatch = text.match(/Storefront Route:\s*(#\/?product\/([A-Za-z0-9_-]+))/i);
   if (routeMatch) {
     return {
       productId: routeMatch[2],
@@ -253,9 +253,9 @@ function setupSalesforceListeners() {
 const cart = [];
 
 function addToCart(id) {
-  const p = products.find(x => x.id === id);
+  const p = products.find(x => String(x.id) === String(id));
   if (!p) return;
-  const existing = cart.find(c => c.id === id);
+  const existing = cart.find(c => String(c.id) === String(id));
   if (existing) existing.qty++;
   else cart.push({ ...p, qty: 1 });
   renderCart();
@@ -263,7 +263,7 @@ function addToCart(id) {
 }
 
 function removeFromCart(id) {
-  const idx = cart.findIndex(c => c.id === id);
+  const idx = cart.findIndex(c => String(c.id) === String(id));
   if (idx > -1) cart.splice(idx, 1);
   renderCart();
 }
@@ -310,9 +310,9 @@ overlay.addEventListener('click', closeCart);
 // Delegated clicks for add / remove
 document.addEventListener('click', (e) => {
   const addBtn = e.target.closest('[data-add]');
-  if (addBtn) { addToCart(parseInt(addBtn.dataset.add, 10)); return; }
+  if (addBtn) { addToCart(addBtn.dataset.add); return; }
   const rmBtn = e.target.closest('[data-remove]');
-  if (rmBtn) { e.preventDefault(); removeFromCart(parseInt(rmBtn.dataset.remove, 10)); }
+  if (rmBtn) { e.preventDefault(); removeFromCart(rmBtn.dataset.remove); }
   const productLink = e.target.closest('[data-product-link]');
   if (productLink) { navigateToProduct(productLink.dataset.productLink); }
 });
