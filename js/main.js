@@ -366,6 +366,7 @@ function processAgentText(compactText) {
 }
 
 function handleVisibleAgentText(text) {
+  console.log('Agent raw text',  text);
   const compactText = text.replace(/\s+/g, ' ').trim();
   if (compactText.length < 12 || observedAgentTexts.has(compactText)) return;
 
