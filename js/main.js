@@ -384,13 +384,12 @@ function handleVisibleAgentText(text) {
 
 function setupAgentDomObserver() {
   const observer = new MutationObserver(mutations => {
-    console.log('mutations====', mutations)
     mutations.forEach(mutation => {
-      console.log('mutation', mutation)
       mutation.addedNodes.forEach(node => {
         if (shouldIgnoreObservedNode(node)) return;
 
         const text = node.textContent || '';
+        //keeps track on the chat
         if (text) handleVisibleAgentText(text);
       });
     });
@@ -400,13 +399,9 @@ function setupAgentDomObserver() {
 }
 
 function setupSalesforceListeners() {
-  window.addEventListener('message', event => {
-    handleAgentMessage(event.data);
-  });
-
-  window.addEventListener('lumina-agent-message', event => {
-    handleAgentMessage(event.detail);
-  });
+  // window.addEventListener('message', event => {
+  //   handleAgentMessage(event.data);
+  // });
 
   setupAgentDomObserver();
 }
