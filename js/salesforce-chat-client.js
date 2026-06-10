@@ -280,8 +280,42 @@
   }
 
   function handleSalesforceEvent(eventPayload) {
-    const texts = extractTextCandidates(eventPayload);
+    const entry = eventPayload?.conversationEntry;
+    const entryType = entry?.entryType;
+    const entryPayload = parseEntryPayload(entry?.entryPayload);
+
+    if (entryType === "SessionStatusChanged" && entryPayload?.sessionStatus) {
+      setStatus(entryPayload.sessionStatus === "Active" ? "Connected to Lumina" : entryPayload.sessionStatus);
+      return;
+    }
+
+    if (entryType === "ParticipantChanged" && hasChatbotParticipant(entryPayload)) {
+      setStatus("Connected to Lumina");
+      return;
+    }
+
+    if (entryType !== "Message") return;
+
+    const senderRole = entry?.sender?.role || entryPayload?.sender?.role;
+    if (senderRole === "EndUser") return;
+
+    const texts = extractTextCandidates(entryPayload);
     texts.forEach(handleIncomingText);
+  }
+
+  function parseEntryPayload(entryPayload) {
+    if (!entryPayload) return null;
+    if (typeof entryPayload === "object") return entryPayload;
+    try {
+      return JSON.parse(entryPayload);
+    } catch {
+      return { text: String(entryPayload) };
+    }
+  }
+
+  function hasChatbotParticipant(entryPayload) {
+    return Array.isArray(entryPayload?.entries) &&
+      entryPayload.entries.some(entry => entry?.participant?.role === "Chatbot");
   }
 
   function extractTextCandidates(value, results = []) {
