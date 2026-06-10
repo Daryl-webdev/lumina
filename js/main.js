@@ -402,7 +402,7 @@ function setupSalesforceListeners() {
   // window.addEventListener('message', event => {
   //   handleAgentMessage(event.data);
   // });
-
+  console.log('test')
   setupAgentDomObserver();
 }
 
