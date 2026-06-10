@@ -251,12 +251,16 @@ function handleAgentCartCommand(payload) {
 }
 
 function handleAgentMessage(payload) {
+  console.log('this 1')
   if (handleAgentCartCommand(payload)) return true;
 
+  console.log('this')
   const navigationTargets = collectTextPayloads(payload)
     .flatMap(parseNavigationTargets)
     .filter((target, index, targets) => targets.findIndex(item => item.productId === target.productId) === index);
 
+  console.log('navigationTargets.length', navigationTargets.length);
+  console.log('navigationTargets', navigationTargets);
   if (navigationTargets.length !== 1) return false;
   return navigateToProduct(navigationTargets[0].productId, navigationTargets[0].productName);
 }
