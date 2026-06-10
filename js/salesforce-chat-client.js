@@ -20,6 +20,7 @@
     launcher: "luminaChatLauncher",
     panel: "luminaChatPanel",
     close: "luminaChatClose",
+    end: "luminaChatEnd",
     messages: "luminaChatMessages",
     form: "luminaChatForm",
     input: "luminaChatInput",
@@ -45,17 +46,19 @@
       </button>
       <aside id="${selectors.panel}" class="lumina-chat__panel" aria-label="Lumina concierge chat" aria-hidden="true">
         <header class="lumina-chat__header">
-          <div>
-            <div class="lumina-chat__title">Lumina Concierge</div>
+          <button class="lumina-chat__menu" type="button" aria-label="Chat options">...</button>
+          <div class="lumina-chat__heading">
+            <div class="lumina-chat__title">Chat</div>
             <div id="${selectors.status}" class="lumina-chat__status">Ready</div>
           </div>
-          <button id="${selectors.close}" class="lumina-chat__close" type="button" aria-label="Close chat">&times;</button>
+          <button id="${selectors.close}" class="lumina-chat__close" type="button" aria-label="Minimize chat">&#8964;</button>
         </header>
         <div id="${selectors.messages}" class="lumina-chat__messages" role="log" aria-live="polite"></div>
         <form id="${selectors.form}" class="lumina-chat__form">
           <input id="${selectors.input}" class="lumina-chat__input" type="text" autocomplete="off" placeholder="Ask about rings..." />
           <button class="lumina-chat__send" type="submit">Send</button>
         </form>
+        <button id="${selectors.end}" class="lumina-chat__end" type="button">End Chat</button>
       </aside>
     `;
     document.body.appendChild(wrapper);
@@ -65,6 +68,7 @@
     const launcher = document.getElementById(selectors.launcher);
     const panel = document.getElementById(selectors.panel);
     const close = document.getElementById(selectors.close);
+    const end = document.getElementById(selectors.end);
     const form = document.getElementById(selectors.form);
     const input = document.getElementById(selectors.input);
 
@@ -82,6 +86,8 @@
       panel.setAttribute("aria-hidden", "true");
       launcher?.focus();
     });
+
+    end?.addEventListener("click", endConversation);
 
     form?.addEventListener("submit", async (event) => {
       event.preventDefault();
@@ -116,6 +122,39 @@
       setStatus("Connection failed");
       appendSystemMessage(error.message || "Unable to connect to Salesforce chat.");
     }
+  }
+
+  async function endConversation() {
+    const conversationId = state.conversationId;
+    try {
+      setStatus("Ending...");
+      if (conversationId && state.accessToken) {
+        await fetch(`${CONFIG.scrt2URL}/iamessage/api/v2/conversation/${conversationId}?esDeveloperName=${CONFIG.esDeveloperName}`, {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${state.accessToken}`,
+            "X-Org-Id": CONFIG.orgId
+          }
+        });
+      }
+    } catch (error) {
+      console.warn("Lumina chat end request failed", error);
+    } finally {
+      state.abortController?.abort();
+      resetConversationState();
+      appendSystemMessage("Chat ended.");
+      setStatus("Ended");
+    }
+  }
+
+  function resetConversationState() {
+    state.accessToken = "";
+    state.conversationId = "";
+    state.connected = false;
+    state.isNewMessagingSession = true;
+    state.abortController = null;
+    state.lastEventId = "";
+    state.outboundTexts = [];
   }
 
   async function requestAccessToken() {
@@ -368,6 +407,7 @@
     parts.forEach(part => {
       if (handlePayloadText(part)) return;
       renderMessage("agent", part);
+      window.LuminaStorefront?.handleAgentText?.(part);
     });
   }
 
@@ -451,9 +491,21 @@
 
     const row = document.createElement("div");
     row.className = `lumina-chat__message lumina-chat__message--${author}`;
-    row.textContent = text;
+    row.innerHTML = formatChatText(text);
     messages.appendChild(row);
     messages.scrollTop = messages.scrollHeight;
+  }
+
+  function formatChatText(text) {
+    return escapeHtml(String(text || ""))
+      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\r?\n/g, "<br>");
+  }
+
+  function escapeHtml(value) {
+    const div = document.createElement("div");
+    div.textContent = value;
+    return div.innerHTML;
   }
 
   function appendSystemMessage(text) {

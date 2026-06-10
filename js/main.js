@@ -123,6 +123,7 @@ let cart = [];
 let activeDiscount = 0; // percentage, e.g. 15 for 15%
 let activeDiscountCode = "";
 let editingProductId = null;
+let recommendationProductIds = null;
 
 // --- Initialize App ---
 document.addEventListener("DOMContentLoaded", () => {
@@ -299,6 +300,23 @@ function findProductBySalesforceCode(productCode) {
   ) || null;
 }
 
+function findProductByRouteKey(routeKey) {
+  if (!routeKey) return null;
+  const normalized = decodeURIComponent(String(routeKey)).trim().toLowerCase();
+  return products.find(product =>
+    String(product.salesforceProductCode || "").trim().toLowerCase() === normalized ||
+    String(product.id || "").trim().toLowerCase() === normalized
+  ) || null;
+}
+
+function getProductRouteKey(product) {
+  return encodeURIComponent(product.salesforceProductCode || product.id);
+}
+
+function getProductHash(product) {
+  return `#product/${getProductRouteKey(product)}`;
+}
+
 function addSalesforceProductToCart(productCode, options = {}) {
   const product = findProductBySalesforceCode(productCode);
   if (!product) {
@@ -320,7 +338,7 @@ function navigateToSalesforceProduct(productCode) {
     return false;
   }
 
-  window.location.hash = `#/product/${product.id}`;
+  window.location.hash = getProductHash(product);
   setTimeout(() => highlightProductInUI(product.id, product.name), 100);
   return true;
 }
@@ -407,9 +425,9 @@ function handleRouting() {
 
   if (!productDetailSection) return;
 
-  if (hash.startsWith("#/product/")) {
-    const productId = hash.replace("#/product/", "");
-    const product = products.find(p => p.id === productId);
+  if (hash.startsWith("#/product/") || hash.startsWith("#product/")) {
+    const routeKey = hash.replace(/^#\/?product\//, "");
+    const product = findProductByRouteKey(routeKey);
 
     if (product) {
       // Hide home sections
@@ -613,7 +631,7 @@ function renderProductDetail(product) {
           const imgHTML = getProductImageHTML(p.image, initials);
           return `
             <div class="recommendation-card">
-              <a href="#/product/${p.id}">
+              <a href="${getProductHash(p)}">
                 <div class="rec-img-wrapper">
                   ${imgHTML}
                 </div>
@@ -728,7 +746,7 @@ function renderAll() {
   
   // Rerender active detail view if open
   const hash = window.location.hash;
-  if (hash.startsWith("#/product/")) {
+  if (hash.startsWith("#/product/") || hash.startsWith("#product/")) {
     handleRouting();
   }
 }
@@ -766,18 +784,22 @@ function renderCarousel() {
   const container = document.getElementById("carouselContainer");
   if (!container) return;
 
-  if (products.length === 0) {
+  const title = document.querySelector("#carousel-section .section-title");
+  const carouselProducts = getCarouselProducts();
+  if (title) title.textContent = recommendationProductIds ? "Top Recommendation" : "Explore Catalog";
+
+  if (carouselProducts.length === 0) {
     container.innerHTML = `<div class="cart-empty-message" style="width: 100%;">No products in catalog. Open the Admin Panel to add some!</div>`;
     return;
   }
 
-  container.innerHTML = products.map(product => {
+  container.innerHTML = carouselProducts.map(product => {
     const initials = getInitials(product.name);
     const imgHTML = getProductImageHTML(product.image, initials);
     
     return `
       <div class="product-card" id="card-${product.id}" data-id="${product.id}">
-        <a href="#/product/${product.id}" class="card-link-wrapper">
+        <a href="${getProductHash(product)}" class="card-link-wrapper">
           <div class="card-img-wrapper">
             ${product.highlighted ? '<span class="card-badge">Highlight</span>' : ''}
             ${imgHTML}
@@ -785,7 +807,7 @@ function renderCarousel() {
         </a>
         <div class="card-content">
           <div class="card-category">${product.category}</div>
-          <h3 class="card-title"><a href="#/product/${product.id}">${product.name}</a></h3>
+          <h3 class="card-title"><a href="${getProductHash(product)}">${product.name}</a></h3>
           <p class="card-desc">${product.description}</p>
           <div class="card-footer">
             <span class="card-price">$${product.price.toLocaleString()}</span>
@@ -797,6 +819,14 @@ function renderCarousel() {
       </div>
     `;
   }).join("");
+}
+
+function getCarouselProducts() {
+  if (!recommendationProductIds) return products;
+  const recommended = recommendationProductIds
+    .map(id => products.find(product => product.id === id))
+    .filter(Boolean);
+  return recommended.length ? recommended : products;
 }
 
 function renderHighlights() {
@@ -816,14 +846,14 @@ function renderHighlights() {
     
     return `
       <div class="highlight-item" id="highlight-${product.id}">
-        <a href="#/product/${product.id}" class="highlight-link-wrapper">
+        <a href="${getProductHash(product)}" class="highlight-link-wrapper">
           <div class="highlight-img-wrapper">
             ${imgHTML}
           </div>
         </a>
         <div class="highlight-info">
           <div class="card-category">${product.category}</div>
-          <h3 class="highlight-title"><a href="#/product/${product.id}">${product.name}</a></h3>
+          <h3 class="highlight-title"><a href="${getProductHash(product)}">${product.name}</a></h3>
           <p class="highlight-desc">${product.description}</p>
           <div class="card-footer">
             <span class="card-price" style="font-size:1.2rem;">$${product.price.toLocaleString()}</span>
@@ -987,7 +1017,17 @@ function setupLuminaSalesforceBridge() {
         return navigateToSalesforceProduct(payload.productCode);
       }
 
+      if (payload.luminaType === "recommendationAction") {
+        const codes = Array.isArray(payload.productCodes)
+          ? payload.productCodes
+          : [payload.productCode].filter(Boolean);
+        return showRecommendedSalesforceProducts(codes);
+      }
+
       return false;
+    },
+    handleAgentText(messageText) {
+      return handleAgentMessage(messageText, "Agentforce Custom Client");
     },
     showToast,
     findProductBySalesforceCode
@@ -1049,59 +1089,25 @@ function handleAgentMessage(messageText, sourceName = "Simulated Agent") {
   const text = messageText.toLowerCase();
   console.log(`[Parser] Running NLP on message: "${messageText}" from ${sourceName}`);
 
-
-
-  // Action variables
   let actionTaken = false;
   let actionDetails = [];
+  const mentionedProducts = findProductsMentionedInText(messageText);
+  const recommendationIntent = /\b(recommend|recommendation|suggest|suggestion|best|top|options|matches|here('s| is) what i found|what i found)\b/i.test(messageText);
+  const detailIntent = /\b(detail|details|description|price|code|product|here('s| is)|found)\b/i.test(messageText);
 
-  // 1. Check for product keyword highlights
-  products.forEach(p => {
-    if (p.keywords) {
-      // Split keywords by comma, trim, and check if any keyword is present in the agent message text
-      const keywordsList = p.keywords.split(",").map(k => k.trim().toLowerCase()).filter(k => k.length > 0);
-      let matchedKeyword = null;
-
-      for (let k of keywordsList) {
-        // Matches exact words or phrases to avoid false positives (like 'ring' in 'spring')
-        const regex = new RegExp(`\\b${k}\\b`);
-        if (regex.test(text)) {
-          matchedKeyword = k;
-          break;
-        }
-      }
-
-      if (matchedKeyword) {
-        // Trigger product highlight!
-        highlightProductInUI(p.id, p.name);
-        actionTaken = true;
-        actionDetails.push(`Highlighted: ${p.name}`);
-      }
-    }
-  });
-
-  // 2. Check for "Add to Cart" instructions
-  // e.g. "I've added the Lumina Solitaire Ring to your cart" or "I'm adding the Pearl Drop Earrings to your bag"
-  const isAddToCartIntent = text.includes("add") || text.includes("added") || text.includes("cart") || text.includes("bag");
-  if (isAddToCartIntent) {
-    products.forEach(p => {
-      // Check if product name or specific identifier is mentioned in the message text
-      const productNameLower = p.name.toLowerCase();
-      // Also check short name identifiers
-      const keywords = p.keywords.split(",").map(k => k.trim().toLowerCase());
-      const isNameInText = text.includes(productNameLower) || keywords.some(k => k.length > 2 && text.includes(k));
-      
-      if (isNameInText) {
-        addToCart(p.id, 1);
-        actionTaken = true;
-        actionDetails.push(`Added to Cart: ${p.name}`);
-      }
-    });
+  if (recommendationIntent && mentionedProducts.length > 1) {
+    showRecommendedProducts(mentionedProducts.slice(0, 3));
+    actionTaken = true;
+    actionDetails.push(`Displayed recommendations: ${mentionedProducts.slice(0, 3).map(product => product.name).join(", ")}`);
+  } else if (detailIntent && mentionedProducts.length === 1) {
+    const product = mentionedProducts[0];
+    window.location.hash = getProductHash(product);
+    setTimeout(() => highlightProductInUI(product.id, product.name), 100);
+    actionTaken = true;
+    actionDetails.push(`Opened product detail: ${product.name}`);
   }
 
-  // 3. Check for promotional discounts
-  // e.g. "Use code AGENT15 for a discount" or "I applied a coupon code for you"
-  const isDiscountIntent = text.includes("discount") || text.includes("promo") || text.includes("coupon") || text.includes("code") || text.includes("percent");
+  const isDiscountIntent = text.includes("discount") || text.includes("promo") || text.includes("coupon") || text.includes("percent");
   if (isDiscountIntent) {
     applyPromoCode("AGENT15");
     actionTaken = true;
@@ -1116,10 +1122,79 @@ function handleAgentMessage(messageText, sourceName = "Simulated Agent") {
   }
 }
 
+function findProductsMentionedInText(messageText) {
+  const text = String(messageText || "").toLowerCase();
+  const seen = new Set();
+  const matches = [];
+
+  products.forEach(product => {
+    const productCode = String(product.salesforceProductCode || "").toLowerCase();
+    const productName = String(product.name || "").toLowerCase();
+    const exactMention =
+      (productCode && text.includes(productCode)) ||
+      (productName && text.includes(productName));
+
+    if (exactMention && !seen.has(product.id)) {
+      seen.add(product.id);
+      matches.push(product);
+    }
+  });
+
+  if (matches.length) return matches.slice(0, 3);
+
+  products.forEach(product => {
+    const keywords = String(product.keywords || "")
+      .split(",")
+      .map(keyword => keyword.trim().toLowerCase())
+      .filter(keyword => keyword.length > 3 && keyword !== "ring");
+
+    const isMentioned = keywords.some(keyword => text.includes(keyword));
+
+    if (isMentioned && !seen.has(product.id)) {
+      seen.add(product.id);
+      matches.push(product);
+    }
+  });
+
+  return matches.slice(0, 3);
+}
+
+function showRecommendedSalesforceProducts(productCodes) {
+  const recommended = productCodes
+    .map(code => findProductBySalesforceCode(code))
+    .filter(Boolean)
+    .slice(0, 3);
+
+  if (!recommended.length) {
+    showToast("No matching recommendations found.", "error");
+    return false;
+  }
+
+  showRecommendedProducts(recommended);
+  return true;
+}
+
+function showRecommendedProducts(recommendedProducts) {
+  recommendationProductIds = recommendedProducts.slice(0, 3).map(product => product.id);
+  window.location.hash = "#carousel-section";
+  renderCarousel();
+  setTimeout(() => {
+    document.getElementById("carousel-section")?.scrollIntoView({ behavior: "smooth" });
+    recommendationProductIds.forEach(productId => {
+      const card = document.getElementById(`card-${productId}`);
+      card?.classList.add("agent-highlighted");
+      setTimeout(() => card?.classList.remove("agent-highlighted"), 5000);
+    });
+  }, 100);
+  showToast("Top recommendations updated.", "success");
+}
+
 // UI Highlight Trigger
 function highlightProductInUI(productId, productName) {
-  // Set window hash to navigate to product detail page!
-  window.location.hash = `#/product/${productId}`;
+  const product = products.find(p => p.id === productId);
+  if (product) {
+    window.location.hash = getProductHash(product);
+  }
   
   // Wait for rendering to complete, then apply highlight effect
   setTimeout(() => {
