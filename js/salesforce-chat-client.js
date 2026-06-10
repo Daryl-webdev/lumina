@@ -42,15 +42,30 @@
     wrapper.className = "lumina-chat";
     wrapper.innerHTML = `
       <button id="${selectors.launcher}" class="lumina-chat__launcher" type="button" aria-label="Open Lumina chat">
-        <span class="lumina-chat__launcher-icon">L</span>
+        <span class="lumina-chat__launcher-icon" aria-hidden="true">
+          <svg viewBox="0 0 52 52" focusable="false">
+            <path d="M14 17.5c0-3 2.4-5.5 5.5-5.5h13c3 0 5.5 2.4 5.5 5.5v7c0 3-2.4 5.5-5.5 5.5h-8.1l-7.8 6.4V30h-1.1c-3 0-5.5-2.4-5.5-5.5v-7Z"></path>
+            <circle cx="20.5" cy="21" r="1.8"></circle>
+            <circle cx="26" cy="21" r="1.8"></circle>
+            <circle cx="31.5" cy="21" r="1.8"></circle>
+          </svg>
+        </span>
       </button>
       <aside id="${selectors.panel}" class="lumina-chat__panel" aria-label="Lumina concierge chat" aria-hidden="true">
         <header class="lumina-chat__header">
-          <button class="lumina-chat__menu" type="button" aria-label="Chat options">...</button>
+          <div class="lumina-chat__avatar" aria-hidden="true">
+            <svg viewBox="0 0 52 52" focusable="false">
+              <path d="M14 17.5c0-3 2.4-5.5 5.5-5.5h13c3 0 5.5 2.4 5.5 5.5v7c0 3-2.4 5.5-5.5 5.5h-8.1l-7.8 6.4V30h-1.1c-3 0-5.5-2.4-5.5-5.5v-7Z"></path>
+              <circle cx="20.5" cy="21" r="1.8"></circle>
+              <circle cx="26" cy="21" r="1.8"></circle>
+              <circle cx="31.5" cy="21" r="1.8"></circle>
+            </svg>
+          </div>
           <div class="lumina-chat__heading">
-            <div class="lumina-chat__title">Chat</div>
+            <div class="lumina-chat__title">Lumina Assistant</div>
             <div id="${selectors.status}" class="lumina-chat__status">Ready</div>
           </div>
+          <button class="lumina-chat__menu" type="button" aria-label="Chat options">...</button>
           <button id="${selectors.close}" class="lumina-chat__close" type="button" aria-label="Minimize chat">&#8964;</button>
         </header>
         <div id="${selectors.messages}" class="lumina-chat__messages" role="log" aria-live="polite"></div>
@@ -58,7 +73,7 @@
           <input id="${selectors.input}" class="lumina-chat__input" type="text" autocomplete="off" placeholder="Ask about rings..." />
           <button class="lumina-chat__send" type="submit">Send</button>
         </form>
-        <button id="${selectors.end}" class="lumina-chat__end" type="button">End Chat</button>
+        <button id="${selectors.end}" class="lumina-chat__end" type="button">End Conversation</button>
       </aside>
     `;
     document.body.appendChild(wrapper);
@@ -95,6 +110,7 @@
       if (!text) return;
       input.value = "";
       renderMessage("user", text);
+      window.LuminaStorefront?.handleUserText?.(text);
       await sendMessage(text);
     });
 

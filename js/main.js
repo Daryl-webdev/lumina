@@ -124,6 +124,7 @@ let activeDiscount = 0; // percentage, e.g. 15 for 15%
 let activeDiscountCode = "";
 let editingProductId = null;
 let recommendationProductIds = null;
+let pendingDetailProductId = null;
 
 // --- Initialize App ---
 document.addEventListener("DOMContentLoaded", () => {
@@ -340,6 +341,7 @@ function navigateToSalesforceProduct(productCode) {
 
   window.location.hash = getProductHash(product);
   setTimeout(() => highlightProductInUI(product.id, product.name), 100);
+  pendingDetailProductId = null;
   return true;
 }
 
@@ -1029,6 +1031,9 @@ function setupLuminaSalesforceBridge() {
     handleAgentText(messageText) {
       return handleAgentMessage(messageText, "Agentforce Custom Client");
     },
+    handleUserText(messageText) {
+      return handleUserMessage(messageText);
+    },
     showToast,
     findProductBySalesforceCode
   };
@@ -1092,19 +1097,24 @@ function handleAgentMessage(messageText, sourceName = "Simulated Agent") {
   let actionTaken = false;
   let actionDetails = [];
   const mentionedProducts = findProductsMentionedInText(messageText);
+  const pendingDetailProduct = pendingDetailProductId
+    ? products.find(product => product.id === pendingDetailProductId)
+    : null;
   const recommendationIntent = /\b(recommend|recommendation|suggest|suggestion|best|top|options|matches|here('s| is) what i found|what i found)\b/i.test(messageText);
   const detailIntent = /\b(detail|details|description|price|code|product|here('s| is)|found)\b/i.test(messageText);
 
-  if (recommendationIntent && mentionedProducts.length > 1) {
+  if (recommendationIntent && mentionedProducts.length >= 1) {
     showRecommendedProducts(mentionedProducts.slice(0, 3));
     actionTaken = true;
     actionDetails.push(`Displayed recommendations: ${mentionedProducts.slice(0, 3).map(product => product.name).join(", ")}`);
-  } else if (detailIntent && mentionedProducts.length === 1) {
-    const product = mentionedProducts[0];
+    pendingDetailProductId = null;
+  } else if ((detailIntent && mentionedProducts.length === 1) || pendingDetailProduct) {
+    const product = mentionedProducts.length === 1 ? mentionedProducts[0] : pendingDetailProduct;
     window.location.hash = getProductHash(product);
     setTimeout(() => highlightProductInUI(product.id, product.name), 100);
     actionTaken = true;
     actionDetails.push(`Opened product detail: ${product.name}`);
+    pendingDetailProductId = null;
   }
 
   const isDiscountIntent = text.includes("discount") || text.includes("promo") || text.includes("coupon") || text.includes("percent");
@@ -1122,6 +1132,25 @@ function handleAgentMessage(messageText, sourceName = "Simulated Agent") {
   }
 }
 
+function handleUserMessage(messageText) {
+  const detailRequest = /\b(show|open|view|see|tell|give|get|display)\b[\s\S]{0,80}\b(detail|details|description|price|code|product)\b|\b(detail|details|description|price|code)\b[\s\S]{0,80}\b(of|for|about)\b/i.test(messageText);
+  const recommendationRequest = /\b(recommend|recommendation|suggest|suggestion|best|top|options|matches)\b/i.test(messageText);
+  const mentionedProducts = findProductsMentionedInText(messageText);
+
+  if (recommendationRequest) {
+    pendingDetailProductId = null;
+    return false;
+  }
+
+  if (detailRequest && mentionedProducts.length === 1) {
+    pendingDetailProductId = mentionedProducts[0].id;
+    console.log(`[Parser INFO] Pending detail route target from user prompt: ${mentionedProducts[0].name}`);
+    return true;
+  }
+
+  return false;
+}
+
 function findProductsMentionedInText(messageText) {
   const text = String(messageText || "").toLowerCase();
   const seen = new Set();
@@ -1135,6 +1164,22 @@ function findProductsMentionedInText(messageText) {
       (productName && text.includes(productName));
 
     if (exactMention && !seen.has(product.id)) {
+      seen.add(product.id);
+      matches.push(product);
+    }
+  });
+
+  if (matches.length) return matches.slice(0, 3);
+
+  products.forEach(product => {
+    const nameWords = String(product.name || "")
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter(word => word.length > 3 && word !== "ring");
+    const matchedWords = nameWords.filter(word => text.includes(word));
+    const enoughNameMatch = matchedWords.length >= Math.min(2, nameWords.length);
+
+    if (enoughNameMatch && !seen.has(product.id)) {
       seen.add(product.id);
       matches.push(product);
     }
