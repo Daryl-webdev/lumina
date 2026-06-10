@@ -349,6 +349,7 @@ function processAgentText(compactText) {
 
   if (handleAgentMessage(compactText)) return;
 
+  // Fallback when the agent forgot the LUMINA_* token. Triggered only when a single known product is mentioned alongside the human confirmation line.
   const mentionedProducts = findMentionedProducts(compactText);
   if (mentionedProducts.length === 1) {
     const checkoutRequested = /proceeding to checkout:/i.test(compactText);
@@ -386,20 +387,65 @@ function handleVisibleAgentText(text) {
   }, AGENT_TEXT_DEBOUNCE_MS);
 }
 
+// Patterns to strip from the visible bubble. Token may arrive on its own line
+// (preferred) or inline. The leading \n? swallows the separating newline when
+// the token sits on its own line so we don't leave a blank line behind.
+const TOKEN_STRIP_PATTERNS = [
+  /\n?LUMINA_CART_ADD\|productId=[^|]+\|checkout=(?:true|false)\|name=[^\n\r]+/g,
+  /\n?LUMINA_NAVIGATE_PRODUCT\|productId=[^|]+\|route=#[^|\s]+\|name=[^\n\r]+/g
+];
+
+function stripTokensFromString(text) {
+  let out = text;
+  for (const re of TOKEN_STRIP_PATTERNS) out = out.replace(re, '');
+  return out.replace(/\n{2,}/g, '\n').trimEnd();
+}
+
+function scrubTokensInNode(root) {
+  if (!root) return;
+  const doc = root.ownerDocument || document;
+  const target = root.nodeType === Node.TEXT_NODE ? root.parentNode : root;
+  if (!target || shouldIgnoreObservedNode(target)) return;
+
+  const walker = doc.createTreeWalker(target, NodeFilter.SHOW_TEXT, null);
+  let node;
+  while ((node = walker.nextNode())) {
+    const original = node.nodeValue;
+    if (!original || original.indexOf('LUMINA_') === -1) continue;
+    const cleaned = stripTokensFromString(original);
+    if (cleaned !== original) node.nodeValue = cleaned;
+  }
+}
+
 function setupAgentDomObserver() {
   const observer = new MutationObserver(mutations => {
     mutations.forEach(mutation => {
       mutation.addedNodes.forEach(node => {
         if (shouldIgnoreObservedNode(node)) return;
-
         const text = node.textContent || '';
-        //keeps track on the chat
-        if (text) handleVisibleAgentText(text);
+        if (text) {
+          handleVisibleAgentText(text);
+          scrubTokensInNode(node);
+        }
       });
+
+      if (mutation.type === 'characterData') {
+        const node = mutation.target;
+        if (shouldIgnoreObservedNode(node)) return;
+        const text = node.textContent || '';
+        if (text) {
+          handleVisibleAgentText(text);
+          scrubTokensInNode(node);
+        }
+      }
     });
   });
 
-  observer.observe(document.body, { childList: true, subtree: true });
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+    characterData: true
+  });
 }
 
 function setupSalesforceListeners() {
