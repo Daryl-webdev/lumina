@@ -339,6 +339,7 @@ let pendingAgentText = '';
 let pendingAgentTimer = null;
 
 function processAgentText(compactText) {
+  console.log('agent text', compactText);
   if (!compactText || observedAgentTexts.has(compactText)) return;
   observedAgentTexts.add(compactText);
 
@@ -359,9 +360,9 @@ function processAgentText(compactText) {
     return;
   }
 
-  if (mentionedProducts.length > 1) {
-    renderAgentSuggestions(mentionedProducts);
-  }
+  // if (mentionedProducts.length > 1) {
+  //   renderAgentSuggestions(mentionedProducts);
+  // }
 }
 
 function handleVisibleAgentText(text) {
@@ -382,7 +383,9 @@ function handleVisibleAgentText(text) {
 
 function setupAgentDomObserver() {
   const observer = new MutationObserver(mutations => {
+    console.log('mutations====', mutations)
     mutations.forEach(mutation => {
+      console.log('mutation', mutation)
       mutation.addedNodes.forEach(node => {
         if (shouldIgnoreObservedNode(node)) return;
 
