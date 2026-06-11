@@ -2,7 +2,6 @@
 const DEFAULT_PRODUCTS = [
   {
     id: "prod-1",
-    salesforceProductCode: "LUMIN-RING-001",
     name: "Gold Solitaire Diamond Ring",
     price: 4500,
     category: "Rings",
@@ -13,7 +12,6 @@ const DEFAULT_PRODUCTS = [
   },
   {
     id: "prod-2",
-    salesforceProductCode: "AURA-EAR-002",
     name: "Platinum Diamond Halo Ring",
     price: 5800,
     category: "Rings",
@@ -24,7 +22,6 @@ const DEFAULT_PRODUCTS = [
   },
   {
     id: "prod-3",
-    salesforceProductCode: "ETERN-BRAC-003",
     name: "Gold Three-Stone Ring",
     price: 6400,
     category: "Rings",
@@ -35,7 +32,6 @@ const DEFAULT_PRODUCTS = [
   },
   {
     id: "prod-4",
-    salesforceProductCode: "CELEST-NECK-004",
     name: "Platinum Pavé Diamond Band",
     price: 3200,
     category: "Rings",
@@ -46,7 +42,6 @@ const DEFAULT_PRODUCTS = [
   },
   {
     id: "prod-5",
-    salesforceProductCode: "OPUL-RING-005",
     name: "Gold Eternity Diamond Ring",
     price: 4200,
     category: "Rings",
@@ -57,7 +52,6 @@ const DEFAULT_PRODUCTS = [
   },
   {
     id: "prod-6",
-    salesforceProductCode: "CASC-EAR-006",
     name: "Marquise Cut Solitaire Ring",
     price: 5500,
     category: "Rings",
@@ -68,7 +62,6 @@ const DEFAULT_PRODUCTS = [
   },
   {
     id: "prod-7",
-    salesforceProductCode: "MINIM-BRAC-007",
     name: "Princess Cut Solitaire Ring",
     price: 4900,
     category: "Rings",
@@ -79,7 +72,6 @@ const DEFAULT_PRODUCTS = [
   },
   {
     id: "prod-8",
-    salesforceProductCode: "ELYS-NECK-008",
     name: "Cushion Cut Halo Ring",
     price: 6100,
     category: "Rings",
@@ -90,7 +82,6 @@ const DEFAULT_PRODUCTS = [
   },
   {
     id: "prod-9",
-    salesforceProductCode: "CLASS-EAR-009",
     name: "Vintage Filigree Bezel Ring",
     price: 3800,
     category: "Rings",
@@ -101,7 +92,6 @@ const DEFAULT_PRODUCTS = [
   },
   {
     id: "prod-10",
-    salesforceProductCode: "AMOR-RING-010",
     name: "Bezel Solitaire Platinum Ring",
     price: 4700,
     category: "Rings",
@@ -112,11 +102,6 @@ const DEFAULT_PRODUCTS = [
   }
 ];
 
-const SALESFORCE_PRODUCT_CODES_BY_NAME = DEFAULT_PRODUCTS.reduce((map, product) => {
-  map[product.name.toLowerCase()] = product.salesforceProductCode;
-  return map;
-}, {});
-
 // --- Application State ---
 let products = [];
 let cart = [];
@@ -124,7 +109,6 @@ let activeDiscount = 0; // percentage, e.g. 15 for 15%
 let activeDiscountCode = "";
 let editingProductId = null;
 let recommendationProductIds = null;
-let pendingDetailProductId = null;
 
 // --- Initialize App ---
 document.addEventListener("DOMContentLoaded", () => {
@@ -152,7 +136,7 @@ function initProducts() {
       if (!Array.isArray(parsed) || parsed.length !== 10 || !parsed[0].image.includes("Gemini_Generated") || hasNonRing) {
         needsReset = true;
       } else {
-        products = applySalesforceProductCodes(parsed);
+        products = normalizeProducts(parsed);
       }
     } catch (e) {
       console.error("Error parsing stored products, resetting to defaults", e);
@@ -168,10 +152,9 @@ function initProducts() {
   }
 }
 
-function applySalesforceProductCodes(productList) {
+function normalizeProducts(productList) {
   return productList.map(product => ({
-    ...product,
-    salesforceProductCode: product.salesforceProductCode || SALESFORCE_PRODUCT_CODES_BY_NAME[(product.name || "").toLowerCase()] || product.id
+    ...product
   }));
 }
 
@@ -192,7 +175,6 @@ function saveProducts() {
 function addProduct(productData) {
   const newProduct = {
     id: "prod-" + Date.now(),
-    salesforceProductCode: productData.salesforceProductCode || "",
     name: productData.name,
     price: parseFloat(productData.price) || 0,
     category: productData.category,
@@ -296,7 +278,6 @@ function findProductBySalesforceCode(productCode) {
   if (!productCode) return null;
   const normalized = String(productCode).trim().toLowerCase();
   return products.find(product =>
-    String(product.salesforceProductCode || "").trim().toLowerCase() === normalized ||
     String(product.id || "").trim().toLowerCase() === normalized
   ) || null;
 }
@@ -305,13 +286,12 @@ function findProductByRouteKey(routeKey) {
   if (!routeKey) return null;
   const normalized = decodeURIComponent(String(routeKey)).trim().toLowerCase();
   return products.find(product =>
-    String(product.salesforceProductCode || "").trim().toLowerCase() === normalized ||
     String(product.id || "").trim().toLowerCase() === normalized
   ) || null;
 }
 
 function getProductRouteKey(product) {
-  return encodeURIComponent(product.salesforceProductCode || product.id);
+  return encodeURIComponent(product.id);
 }
 
 function getProductHash(product) {
@@ -341,7 +321,6 @@ function navigateToSalesforceProduct(productCode) {
 
   window.location.hash = getProductHash(product);
   setTimeout(() => highlightProductInUI(product.id, product.name), 100);
-  pendingDetailProductId = null;
   return true;
 }
 
@@ -427,6 +406,37 @@ function handleRouting() {
 
   if (!productDetailSection) return;
 
+  if (hash.startsWith("#/add-to-cart/") || hash.startsWith("#add-to-cart/")) {
+    const routeKey = hash.replace(/^#\/?add-to-cart\//, "");
+    addSalesforceProductToCart(decodeURIComponent(routeKey));
+    openCart();
+    return;
+  }
+
+  if (hash.startsWith("#/recommendation/") || hash.startsWith("#recommendation/")) {
+    const routeValue = hash.replace(/^#\/?recommendation\//, "");
+    const productCodes = parseRecommendationRouteProductIds(routeValue);
+    const recommendedProducts = getRecommendedSalesforceProducts(productCodes);
+    if (recommendedProducts.length) {
+      // Hide home sections
+      if (heroBanner) heroBanner.style.display = "none";
+      if (carouselSection) carouselSection.style.display = "none";
+      if (highlightSection) highlightSection.style.display = "none";
+
+      // Show detail section
+      productDetailSection.style.display = "block";
+
+      // Render recommendation detail view
+      renderProductDetail(recommendedProducts[0], { recommendationProducts: recommendedProducts });
+
+      // Scroll to top
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      window.location.hash = "#";
+    }
+    return;
+  }
+
   if (hash.startsWith("#/product/") || hash.startsWith("#product/")) {
     const routeKey = hash.replace(/^#\/?product\//, "");
     const product = findProductByRouteKey(routeKey);
@@ -471,9 +481,13 @@ function handleRouting() {
 }
 
 // --- Render Product Detail Page (David Yurman Inspired) ---
-function renderProductDetail(product) {
+function renderProductDetail(product, options = {}) {
   const container = document.getElementById("productDetailSection");
   if (!container) return;
+
+  const recommendationProducts = Array.isArray(options.recommendationProducts)
+    ? options.recommendationProducts.slice(0, 3)
+    : [];
 
   if (product.name.toLowerCase().includes("platinum")) {
     detailSelectedMetal = "Platinum";
@@ -485,20 +499,34 @@ function renderProductDetail(product) {
   const renderContent = () => {
     const adjustedPrice = getAdjustedPrice(product, detailSelectedMetal);
     const initials = getInitials(product.name);
+    const isRecommendationDetail = recommendationProducts.length > 0;
     
     // Breadcrumbs
     const breadcrumbs = `
       <div class="breadcrumbs container">
-        <a href="#">Home</a> &gt; <a href="#carousel-section">Fine Jewelry</a> &gt; <a href="#carousel-section">Rings</a> &gt; <span>${product.name}</span>
+        <a href="#">Home</a> &gt; <a href="#carousel-section">Fine Jewelry</a> &gt; <a href="#carousel-section">Rings</a> &gt; <span>${isRecommendationDetail ? "Recommended Rings" : product.name}</span>
       </div>
     `;
+
+    const recommendationRail = isRecommendationDetail ? `
+      <div class="recommendation-preview-rail" aria-label="Recommended products">
+        ${recommendationProducts.map(recommendation => `
+          <button class="recommendation-preview-btn ${recommendation.id === product.id ? "active" : ""}" type="button" data-product-id="${recommendation.id}" aria-label="View ${recommendation.name}">
+            <span class="recommendation-preview-badge">Recommend</span>
+            <img src="${recommendation.image}" alt="${recommendation.name}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+            <span class="recommendation-preview-fallback" style="display:none;">${getInitials(recommendation.name)}</span>
+          </button>
+        `).join("")}
+      </div>
+    ` : "";
 
     // Premium Split Page Layout
     container.innerHTML = `
       ${breadcrumbs}
-      <div class="container product-detail-grid">
+      <div class="container product-detail-grid ${isRecommendationDetail ? "product-detail-grid--recommendation" : ""}">
         <!-- Left Column: Gallery -->
         <div class="detail-gallery">
+          ${recommendationRail}
           <div class="detail-main-image-wrapper">
             <img src="${product.image}" alt="${product.name}" id="detailMainImg" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
             <div class="card-img-fallback" style="display:none; font-size: 2rem;">
@@ -620,6 +648,17 @@ function renderProductDetail(product) {
         </div>
       </section>
     `;
+
+    const recommendationPreviewBtns = container.querySelectorAll(".recommendation-preview-btn");
+    recommendationPreviewBtns.forEach(btn => {
+      btn.addEventListener("click", () => {
+        const selectedProduct = recommendationProducts.find(recommendation => recommendation.id === btn.dataset.productId);
+        if (selectedProduct) {
+          renderProductDetail(selectedProduct, { recommendationProducts });
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+      });
+    });
 
     // Render recommendation rings
     const recsGrid = document.getElementById("recommendationsGrid");
@@ -748,9 +787,20 @@ function renderAll() {
   
   // Rerender active detail view if open
   const hash = window.location.hash;
-  if (hash.startsWith("#/product/") || hash.startsWith("#product/")) {
+  if (hash.startsWith("#/product/") || hash.startsWith("#product/") || hash.startsWith("#/recommendation/") || hash.startsWith("#recommendation/")) {
     handleRouting();
   }
+}
+
+function parseRecommendationRouteProductIds(routeValue) {
+  return String(routeValue || "")
+    .trim()
+    .replace(/^\[/, "")
+    .replace(/\]$/, "")
+    .split(/[\/,]+/)
+    .map(productId => decodeURIComponent(productId).trim().replace(/^["']|["']$/g, ""))
+    .filter(Boolean)
+    .slice(0, 3);
 }
 
 function getProductImageHTML(imagePath, nameInitials) {
@@ -1031,9 +1081,6 @@ function setupLuminaSalesforceBridge() {
     handleAgentText(messageText) {
       return handleAgentMessage(messageText, "Agentforce Custom Client");
     },
-    handleUserText(messageText) {
-      return handleUserMessage(messageText);
-    },
     showToast,
     findProductBySalesforceCode
   };
@@ -1097,9 +1144,6 @@ function handleAgentMessage(messageText, sourceName = "Simulated Agent") {
   let actionTaken = false;
   let actionDetails = [];
   const mentionedProducts = findProductsMentionedInText(messageText);
-  const pendingDetailProduct = pendingDetailProductId
-    ? products.find(product => product.id === pendingDetailProductId)
-    : null;
   const recommendationIntent = /\b(recommend|recommendation|suggest|suggestion|best|top|options|matches|here('s| is) what i found|what i found)\b/i.test(messageText);
   const detailIntent = /\b(detail|details|description|price|code|product|here('s| is)|found)\b/i.test(messageText);
 
@@ -1107,14 +1151,12 @@ function handleAgentMessage(messageText, sourceName = "Simulated Agent") {
     showRecommendedProducts(mentionedProducts.slice(0, 3));
     actionTaken = true;
     actionDetails.push(`Displayed recommendations: ${mentionedProducts.slice(0, 3).map(product => product.name).join(", ")}`);
-    pendingDetailProductId = null;
-  } else if ((detailIntent && mentionedProducts.length === 1) || pendingDetailProduct) {
-    const product = mentionedProducts.length === 1 ? mentionedProducts[0] : pendingDetailProduct;
+  } else if (detailIntent && mentionedProducts.length === 1) {
+    const product = mentionedProducts[0];
     window.location.hash = getProductHash(product);
     setTimeout(() => highlightProductInUI(product.id, product.name), 100);
     actionTaken = true;
     actionDetails.push(`Opened product detail: ${product.name}`);
-    pendingDetailProductId = null;
   }
 
   const isDiscountIntent = text.includes("discount") || text.includes("promo") || text.includes("coupon") || text.includes("percent");
@@ -1132,35 +1174,15 @@ function handleAgentMessage(messageText, sourceName = "Simulated Agent") {
   }
 }
 
-function handleUserMessage(messageText) {
-  const detailRequest = /\b(show|open|view|see|tell|give|get|display)\b[\s\S]{0,80}\b(detail|details|description|price|code|product)\b|\b(detail|details|description|price|code)\b[\s\S]{0,80}\b(of|for|about)\b/i.test(messageText);
-  const recommendationRequest = /\b(recommend|recommendation|suggest|suggestion|best|top|options|matches)\b/i.test(messageText);
-  const mentionedProducts = findProductsMentionedInText(messageText);
-
-  if (recommendationRequest) {
-    pendingDetailProductId = null;
-    return false;
-  }
-
-  if (detailRequest && mentionedProducts.length === 1) {
-    pendingDetailProductId = mentionedProducts[0].id;
-    console.log(`[Parser INFO] Pending detail route target from user prompt: ${mentionedProducts[0].name}`);
-    return true;
-  }
-
-  return false;
-}
-
 function findProductsMentionedInText(messageText) {
   const text = String(messageText || "").toLowerCase();
   const seen = new Set();
   const matches = [];
 
   products.forEach(product => {
-    const productCode = String(product.salesforceProductCode || "").toLowerCase();
     const productName = String(product.name || "").toLowerCase();
     const exactMention =
-      (productCode && text.includes(productCode)) ||
+      (product.id && text.includes(String(product.id).toLowerCase())) ||
       (productName && text.includes(productName));
 
     if (exactMention && !seen.has(product.id)) {
@@ -1205,10 +1227,7 @@ function findProductsMentionedInText(messageText) {
 }
 
 function showRecommendedSalesforceProducts(productCodes) {
-  const recommended = productCodes
-    .map(code => findProductBySalesforceCode(code))
-    .filter(Boolean)
-    .slice(0, 3);
+  const recommended = getRecommendedSalesforceProducts(productCodes);
 
   if (!recommended.length) {
     showToast("No matching recommendations found.", "error");
@@ -1219,18 +1238,21 @@ function showRecommendedSalesforceProducts(productCodes) {
   return true;
 }
 
+function getRecommendedSalesforceProducts(productCodes) {
+  return productCodes
+    .map(code => findProductBySalesforceCode(code))
+    .filter(Boolean)
+    .slice(0, 3);
+}
+
 function showRecommendedProducts(recommendedProducts) {
   recommendationProductIds = recommendedProducts.slice(0, 3).map(product => product.id);
-  window.location.hash = "#carousel-section";
-  renderCarousel();
-  setTimeout(() => {
-    document.getElementById("carousel-section")?.scrollIntoView({ behavior: "smooth" });
-    recommendationProductIds.forEach(productId => {
-      const card = document.getElementById(`card-${productId}`);
-      card?.classList.add("agent-highlighted");
-      setTimeout(() => card?.classList.remove("agent-highlighted"), 5000);
-    });
-  }, 100);
+  const recommendationHash = `#recommendation/${recommendationProductIds.map(encodeURIComponent).join("/")}`;
+  if (window.location.hash === recommendationHash) {
+    handleRouting();
+  } else {
+    window.location.hash = recommendationHash;
+  }
   showToast("Top recommendations updated.", "success");
 }
 

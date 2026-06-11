@@ -1179,6 +1179,13 @@ textarea.form-control {
 
 /* --- PRODUCT DETAIL PAGE & BREADCRUMBS STYLING --- */
 
+#productDetailSection {
+  position: relative;
+  isolation: isolate;
+  background-color: var(--color-bg-base);
+  overflow: hidden;
+}
+
 .breadcrumbs {
   font-size: 0.8rem;
   color: var(--color-text-secondary);
@@ -1210,6 +1217,8 @@ textarea.form-control {
   gap: 5rem;
   margin-bottom: 5rem;
   align-items: start;
+  position: relative;
+  z-index: 1;
 }
 
 /* Gallery Styles */
@@ -1217,6 +1226,81 @@ textarea.form-control {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.product-detail-grid--recommendation .detail-gallery {
+  display: grid;
+  grid-template-columns: 168px minmax(0, 1fr);
+  gap: 2rem;
+  align-items: start;
+}
+
+.recommendation-preview-rail {
+  display: grid;
+  gap: 1.25rem;
+  align-content: start;
+}
+
+.recommendation-preview-btn {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-sm);
+  background: var(--color-bg-accent);
+  padding: 0;
+  overflow: hidden;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.recommendation-preview-btn img,
+.recommendation-preview-fallback {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.recommendation-preview-fallback {
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-serif);
+  font-size: 1.4rem;
+  color: var(--color-gold);
+  background: var(--color-bg-card);
+}
+
+.recommendation-preview-badge {
+  position: absolute;
+  top: 0.7rem;
+  left: 0.7rem;
+  z-index: 1;
+  padding: 0.28rem 0.45rem;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  color: var(--color-text-secondary);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.recommendation-preview-btn:hover,
+.recommendation-preview-btn.active {
+  border-color: var(--color-gold);
+  box-shadow: var(--shadow-soft);
+  transform: translateY(-2px);
+}
+
+.recommendation-preview-btn.active::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 3px solid var(--color-gold);
+  pointer-events: none;
 }
 
 .detail-main-image-wrapper {
@@ -1226,15 +1310,20 @@ textarea.form-control {
   position: relative;
   overflow: hidden;
   aspect-ratio: 1;
+  width: 100%;
+  max-height: min(680px, calc(100vh - 150px));
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 0;
 }
 
 .detail-main-image-wrapper img {
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center;
   transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1), filter 0.6s ease;
 }
 
@@ -1242,6 +1331,10 @@ textarea.form-control {
   display: flex;
   gap: 1rem;
   justify-content: center;
+}
+
+.product-detail-grid--recommendation .detail-thumbnails {
+  grid-column: 2;
 }
 
 .thumb-btn {
@@ -1276,6 +1369,8 @@ textarea.form-control {
 .detail-info {
   position: sticky;
   top: 110px; /* Stays fixed below navbar */
+  z-index: 2;
+  background-color: var(--color-bg-base);
 }
 
 .detail-brand-header {
@@ -1554,6 +1649,7 @@ textarea.form-control {
 }
 
 .rec-img-wrapper {
+  position: relative;
   aspect-ratio: 1;
   overflow: hidden;
   margin-bottom: 1rem;
@@ -1626,8 +1722,8 @@ textarea.form-control {
 /* Salesforce custom chat client */
 .lumina-chat {
   position: fixed;
-  right: 22px;
-  bottom: 22px;
+  right: 18px;
+  bottom: 0;
   z-index: 1200;
   font-family: var(--font-sans);
 }
@@ -1662,13 +1758,14 @@ textarea.form-control {
 .lumina-chat__panel {
   position: absolute;
   right: 0;
-  bottom: 72px;
-  width: min(392px, calc(100vw - 32px));
-  height: min(560px, calc(100vh - 120px));
+  bottom: 0;
+  width: min(400px, calc(100vw - 24px));
+  height: min(640px, calc(100vh - 18px));
   background: #fff;
-  border: 1px solid rgba(24, 24, 24, 0.12);
-  border-radius: 8px;
-  box-shadow: 0 16px 42px rgba(24, 24, 24, 0.22);
+  border: 1px solid #dddbda;
+  border-bottom: 0;
+  border-radius: 0;
+  box-shadow: 0 0 20px rgba(24, 24, 24, 0.16);
   overflow: hidden;
   display: none;
   flex-direction: column;
@@ -1679,14 +1776,15 @@ textarea.form-control {
 }
 
 .lumina-chat__header {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.85rem 0.9rem;
-  background: #0176d3;
-  color: #fff;
-  border-bottom: 0;
+  justify-content: center;
+  min-height: 72px;
+  padding: 0 3.5rem;
+  background: #fff;
+  color: #181818;
+  border-bottom: 1px solid #dddbda;
 }
 
 .lumina-chat__avatar {
@@ -1699,47 +1797,117 @@ textarea.form-control {
 }
 
 .lumina-chat__heading {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
+  text-align: center;
 }
 
 .lumina-chat__menu {
-  width: 32px;
-  height: 32px;
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  width: 44px;
+  height: 44px;
+  transform: translateY(-50%);
   border: 0;
   border-radius: 4px;
   background: transparent;
-  color: #fff;
-  font-size: 1.25rem;
-  font-weight: 700;
-  line-height: 0.7;
-  letter-spacing: 0;
+  color: #181818;
   cursor: pointer;
+}
+
+.lumina-chat__menu span,
+.lumina-chat__menu span::before,
+.lumina-chat__menu span::after {
+  position: absolute;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+  transform: translateX(-50%);
+}
+
+.lumina-chat__menu span {
+  top: 20px;
+}
+
+.lumina-chat__menu span::before {
+  top: -8px;
+}
+
+.lumina-chat__menu span::after {
+  top: 8px;
 }
 
 .lumina-chat__title {
   font-family: var(--font-sans);
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: 1.12rem;
+  font-weight: 500;
   line-height: 1.2;
 }
 
 .lumina-chat__status {
-  margin-top: 0.12rem;
+  margin-top: 0.25rem;
   font-size: 0.72rem;
-  color: rgba(255, 255, 255, 0.85);
+  color: #706e6b;
 }
 
 .lumina-chat__close {
-  width: 32px;
-  height: 32px;
+  position: absolute;
+  right: 12px;
+  top: 0;
+  width: 44px;
+  height: 44px;
   border: 0;
   border-radius: 4px;
   background: transparent;
-  color: #fff;
-  font-size: 2rem;
-  line-height: 1;
+  color: #181818;
   cursor: pointer;
+}
+
+.lumina-chat__close span {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-right: 3px solid currentColor;
+  border-bottom: 3px solid currentColor;
+  transform: rotate(45deg) translateY(-4px);
+}
+
+.lumina-chat__menu-dropdown {
+  position: absolute;
+  top: 58px;
+  left: 12px;
+  z-index: 3;
+  min-width: 178px;
+  padding: 0.35rem 0;
+  background: #fff;
+  border: 1px solid #dddbda;
+  box-shadow: 0 6px 18px rgba(24, 24, 24, 0.18);
+  display: none;
+}
+
+.lumina-chat__panel.is-menu-open .lumina-chat__menu-dropdown {
+  display: block;
+}
+
+.lumina-chat__menu-item {
+  width: 100%;
+  border: 0;
+  background: #fff;
+  color: #181818;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 0.75rem 1rem;
+  text-align: left;
+}
+
+.lumina-chat__menu-item:hover,
+.lumina-chat__menu-item:focus {
+  background: #f3f3f3;
 }
 
 .lumina-chat__messages {
@@ -1751,6 +1919,13 @@ textarea.form-control {
   gap: 0.65rem;
   background: #f3f3f3;
   scrollbar-color: #8f8f8f transparent;
+}
+
+.lumina-chat__panel.is-menu-open .lumina-chat__messages,
+.lumina-chat__panel.is-menu-open .lumina-chat__form {
+  filter: grayscale(1);
+  opacity: 0.42;
+  pointer-events: none;
 }
 
 .lumina-chat__messages::-webkit-scrollbar {
@@ -1774,9 +1949,9 @@ textarea.form-control {
 
 .lumina-chat__message--user {
   align-self: flex-end;
-  background: #0176d3;
+  background: #2f2f2f;
   color: #fff;
-  border: 1px solid #0176d3;
+  border: 1px solid #2f2f2f;
   border-bottom-right-radius: 4px;
 }
 
@@ -1786,9 +1961,9 @@ textarea.form-control {
 
 .lumina-chat__message--agent {
   align-self: flex-start;
-  background: #fff;
+  background: #f1f1f1;
   color: #181818;
-  border: 1px solid rgba(24, 24, 24, 0.08);
+  border: 1px solid #f1f1f1;
   border-bottom-left-radius: 4px;
 }
 
@@ -1806,10 +1981,8 @@ textarea.form-control {
 }
 
 .lumina-chat__form {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 0.6rem;
-  padding: 0.85rem;
+  display: block;
+  padding: 1rem 1.15rem;
   border-top: 1px solid #dddbda;
   background: #fff;
 }
@@ -1818,6 +1991,7 @@ textarea.form-control {
   min-width: 0;
   border: 1px solid #747474;
   border-radius: 4px;
+  width: 100%;
   padding: 0.75rem 0.8rem;
   font: inherit;
   color: #181818;
@@ -1825,26 +1999,7 @@ textarea.form-control {
 }
 
 .lumina-chat__send {
-  border: 0;
-  border-radius: 4px;
-  padding: 0 0.9rem;
-  background: #0176d3;
-  color: #fff;
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.lumina-chat__end {
-  border: 0;
-  border-top: 1px solid #dddbda;
-  background: #fff;
-  color: #0176d3;
-  font: inherit;
-  font-size: 0.85rem;
-  font-weight: 600;
-  padding: 0.7rem;
-  cursor: pointer;
+  display: none;
 }
 
 /* Responsive Grid overrides */
@@ -1852,6 +2007,11 @@ textarea.form-control {
   .product-detail-grid {
     grid-template-columns: 1fr;
     gap: 3rem;
+  }
+
+  .product-detail-grid--recommendation .detail-gallery {
+    grid-template-columns: 132px minmax(0, 1fr);
+    gap: 1.25rem;
   }
   
   .detail-info {
@@ -1865,6 +2025,23 @@ textarea.form-control {
 }
 
 @media (max-width: 576px) {
+  .product-detail-grid--recommendation .detail-gallery {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .recommendation-preview-rail {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .recommendation-preview-badge {
+    top: 0.45rem;
+    left: 0.45rem;
+    font-size: 0.5rem;
+  }
+
   .recommendations-grid {
     grid-template-columns: 1fr;
     gap: 1.5rem;
